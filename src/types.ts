@@ -100,6 +100,7 @@ export interface StudyDay {
 export interface Settings {
   displayName: string;
   nvidiaApiKey: string;
+  nvidiaApiKeyVerified: boolean;
   nvidiaModel: string;
   aiProvider: "NVIDIA";
   bufferPercent: number;
@@ -119,10 +120,14 @@ export interface AppState {
   studyDays: StudyDay[];
 }
 
+export const DEFAULT_NVIDIA_MODEL = "nvidia/nvidia-nemotron-nano-9b-v2";
+export const DEPRECATED_NVIDIA_MODELS = ["nvidia/llama-3.1-nemotron-70b-instruct"];
+
 export const DEFAULT_SETTINGS: Settings = {
   displayName: "Adi",
   nvidiaApiKey: "",
-  nvidiaModel: "nvidia/llama-3.1-nemotron-70b-instruct",
+  nvidiaApiKeyVerified: false,
+  nvidiaModel: DEFAULT_NVIDIA_MODEL,
   aiProvider: "NVIDIA",
   bufferPercent: 12,
   revisionIntervals: [1, 7, 21, 45],

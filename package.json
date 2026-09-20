@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.81",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

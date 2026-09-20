@@ -23,7 +23,7 @@ export function AIScreen() {
     setQ(question);
     const local = planToText(buildPlan(state));
     if (!state.settings.nvidiaApiKey.trim()) {
-      setA(`${local}\n\nAdd a NVIDIA API key in Settings for model-backed analysis. The local planner already uses your timetable, backlog, and revisions.`);
+      setA(`${local}\n\nAdd a NVIDIA API key in Settings and verify it. The local planner already uses your timetable, backlog, and revisions.`);
       setBusy(false);
       return;
     }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAppState, store } from "../store/store";
 import { EmptyState } from "../components/ui";
 import { lecturesForTopic } from "../lib/taxonomy";
+import { LiquidMetalButton } from "../components/LiquidMetal";
 
 export function Taxonomy() {
   const state = useAppState();
@@ -54,9 +55,9 @@ export function Taxonomy() {
             <h2>
               <InlineRename value={subject.name} onSave={(name) => store.renameSubject(subject.id, name)} />
             </h2>
-            <button className="icon-btn" onClick={() => store.deleteSubject(subject.id)}>
+            <LiquidMetalButton size="sm" onClick={() => store.deleteSubject(subject.id)}>
               Delete subject
-            </button>
+            </LiquidMetalButton>
             <AddInline placeholder="Add chapter" onAdd={(name) => store.addChapter(subject.id, name)} />
             {state.chapters
               .filter((c) => c.subjectId === subject.id)
@@ -78,19 +79,21 @@ export function Taxonomy() {
                       style={{ width: 64, marginLeft: 8 }}
                     />
                   </label>
-                  <button className="icon-btn" onClick={() => store.deleteChapter(chapter.id)}>
+                  <LiquidMetalButton size="sm" onClick={() => store.deleteChapter(chapter.id)}>
                     Delete chapter
-                  </button>
+                  </LiquidMetalButton>
                   <AddInline placeholder="Add topic" onAdd={(name) => store.addTopic(chapter.id, name)} />
                   {state.topics
                     .filter((t) => t.chapterId === chapter.id)
                     .sort((a, b) => a.order - b.order)
                     .map((topic) => (
                       <div className="topic" key={topic.id}>
-                        <InlineRename value={topic.name} onSave={(name) => store.renameTopic(topic.id, name)} />
-                        <button className="icon-btn" onClick={() => store.deleteTopic(topic.id)}>
-                          ×
-                        </button>
+                        <div className="topic-head">
+                          <InlineRename value={topic.name} onSave={(name) => store.renameTopic(topic.id, name)} />
+                          <LiquidMetalButton size="sm" className="lmb-icon-only" onClick={() => store.deleteTopic(topic.id)} aria-label="Delete topic">
+                            ×
+                          </LiquidMetalButton>
+                        </div>
                         {lecturesForTopic(state, topic.id).map((l) => (
                           <div className="lecture-mini" key={l.id}>
                             <span>L{l.number}</span>

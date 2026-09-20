@@ -10,11 +10,21 @@ import type {
   TimeBlock,
   Topic,
 } from "../types";
+import { DEFAULT_SETTINGS, DEPRECATED_NVIDIA_MODELS, DEFAULT_NVIDIA_MODEL } from "../types";
 import { seedState } from "./seed";
 import { uid, todayISO } from "../lib/format";
 import { nextDueFrom } from "../lib/revisionEngine";
 
 const KEY = "lectureos.v1";
+
+function migrateSettings(partial?: Partial<Settings>): Settings {
+  const settings = { ...DEFAULT_SETTINGS, ...partial };
+  if (DEPRECATED_NVIDIA_MODELS.includes(settings.nvidiaModel)) {
+    settings.nvidiaModel = DEFAULT_NVIDIA_MODEL;
+    settings.nvidiaApiKeyVerified = false;
+  }
+  return settings;
+}
 
 function load(): AppState {
   try {
@@ -22,7 +32,7 @@ function load(): AppState {
     if (!raw) return seedState();
     const parsed = JSON.parse(raw) as AppState;
     if (parsed.version !== 1) return seedState();
-    return parsed;
+    return { ...parsed, settings: migrateSettings(parsed.settings) };
   } catch {
     return seedState();
   }
@@ -100,7 +110,11 @@ export const store = {
     });
   },
   updateSettings(settings: Partial<Settings>) {
-    patch({ settings: { ...state.settings, ...settings } });
+    const next = { ...state.settings, ...settings };
+    if (settings.nvidiaApiKey !== undefined && settings.nvidiaApiKey !== state.settings.nvidiaApiKey) {
+      next.nvidiaApiKeyVerified = settings.nvidiaApiKeyVerified ?? false;
+    }
+    patch({ settings: next });
   },
   addSubject(name: string) {
     const subject: Subject = { id: uid("sub"), name, order: state.subjects.length };

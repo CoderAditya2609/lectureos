@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { EmptyState, Modal } from "../components/ui";
 import { useAppState, store } from "../store/store";
 import { lectureLabel, chapterOf, subjectOf, topicOf } from "../lib/taxonomy";
+import { LiquidMetalButton } from "../components/LiquidMetal";
 import type { Lecture, LectureStatus } from "../types";
 
 const STATUSES: LectureStatus[] = ["upcoming", "pending", "completed", "missed", "needs_revision"];
@@ -143,9 +144,9 @@ export function Lectures() {
                 <button className="icon-btn" onClick={() => startEdit(l)}>
                   Edit
                 </button>
-                <button className="icon-btn" onClick={() => store.deleteLecture(l.id)}>
+                <LiquidMetalButton size="sm" onClick={() => store.deleteLecture(l.id)}>
                   Delete
-                </button>
+                </LiquidMetalButton>
               </div>
             </div>
           ))}

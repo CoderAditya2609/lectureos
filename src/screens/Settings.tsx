@@ -1,7 +1,25 @@
+import { useState } from "react";
 import { useAppState, store } from "../store/store";
+import { LiquidMetalButton } from "../components/LiquidMetal";
+import { verifyNvidiaApiKey, normalizeNvidiaKey } from "../ai/provider";
 
 export function Settings() {
   const { settings } = useAppState();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  async function verifyKey() {
+    setBusy(true);
+    setNote("");
+    const result = await verifyNvidiaApiKey(settings.nvidiaApiKey, settings.nvidiaModel);
+    store.updateSettings({
+      nvidiaApiKey: normalizeNvidiaKey(settings.nvidiaApiKey),
+      nvidiaApiKeyVerified: result.ok,
+      nvidiaModel: result.model,
+    });
+    setNote(result.message);
+    setBusy(false);
+  }
 
   return (
     <div className="page">
@@ -22,7 +40,7 @@ export function Settings() {
           <input
             className="field"
             value={settings.nvidiaModel}
-            onChange={(e) => store.updateSettings({ nvidiaModel: e.target.value })}
+            onChange={(e) => store.updateSettings({ nvidiaModel: e.target.value, nvidiaApiKeyVerified: false })}
           />
         </label>
         <label>
@@ -35,6 +53,17 @@ export function Settings() {
             onChange={(e) => store.updateSettings({ nvidiaApiKey: e.target.value })}
           />
         </label>
+        <div className="key-verify">
+          <LiquidMetalButton size="sm" onClick={verifyKey} disabled={busy || !settings.nvidiaApiKey.trim()}>
+            {busy ? "Checking" : settings.nvidiaApiKeyVerified ? "Verified" : "Verify key"}
+          </LiquidMetalButton>
+          <p className={`key-status ${settings.nvidiaApiKeyVerified ? "ok" : note ? "bad" : ""}`}>
+            {note ||
+              (settings.nvidiaApiKeyVerified
+                ? `Ready · ${settings.nvidiaModel}`
+                : "AI will not run until this key verifies against NVIDIA.")}
+          </p>
+        </div>
         <label>
           <span>Planning buffer (%)</span>
           <input
