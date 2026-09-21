@@ -8,8 +8,10 @@ import { availability, availabilityCopy } from "../lib/scheduleEngine";
 import { backlogSnapshot } from "../lib/backlogEngine";
 import { revisionViews } from "../lib/revisionEngine";
 import { subjectProgress, consistency } from "../lib/analyticsEngine";
-import { buildPlan, planToText } from "../lib/planner";
+import { buildPlan } from "../lib/planner";
 import { askLectureAI } from "../ai/provider";
+import { localInsights, navigateLectureOs } from "../lib/insights";
+import { topicOf } from "../lib/taxonomy";
 
 export function Dashboard() {
   const state = useAppState();
@@ -23,32 +25,59 @@ export function Dashboard() {
   const approaching = revs.filter((r) => r.bucket === "approaching").length;
   const progress = subjectProgress(state);
   const habit = consistency(state);
-  const [planText, setPlanText] = useState<string | null>(null);
+  const plan = useMemo(() => buildPlan(state), [state]);
+  const insights = useMemo(() => localInsights(state), [state]);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
+  const doneCount = tasks.filter((t) => t.done).length;
 
   async function recommend() {
     setBusy(true);
-    const local = buildPlan(state);
-    setPlanText(planToText(local));
+    setAiNote(null);
     if (state.settings.nvidiaApiKey.trim()) {
       try {
-        const ai = await askLectureAI(
+        let text = "";
+        await askLectureAI(
           state,
           "What should I do now? Recommend one next task that fits remaining time, then optionally a second. Be practical. Include a short because-list.",
+          (chunk) => {
+            text += chunk;
+            setAiNote(text);
+          },
         );
-        setPlanText(ai);
       } catch (err) {
-        setPlanText(`${planToText(local)}\n\nAI note: ${err instanceof Error ? err.message : "unavailable"}`);
+        setAiNote(err instanceof Error ? err.message : "NVIDIA is unavailable right now.");
       }
+    } else {
+      setAiNote("Connect NVIDIA in Settings for a model-backed recommendation. The card above already uses your timetable.");
     }
     setBusy(false);
   }
 
+  function startPlan() {
+    const item = plan.primary;
+    if (!item) return;
+    if (item.revisionId) {
+      navigateLectureOs("revision");
+      return;
+    }
+    if (item.taskId) return;
+    if (item.lectureId) {
+      const exists = state.tasks.some((t) => t.date === today && t.lectureId === item.lectureId);
+      if (!exists) {
+        store.addTask({ title: item.title, lectureId: item.lectureId, durationMin: item.estimatedMin });
+      }
+    }
+  }
+
+  const lecture = plan.primary?.lectureId ? state.lectures.find((l) => l.id === plan.primary?.lectureId) : undefined;
+  const topic = lecture ? topicOf(state, lecture) : undefined;
+
   return (
     <div className="page">
-      <p className="kicker">LectureOS</p>
+      <p className="kicker">Today</p>
       <div className="hero-row">
         <div>
           <h1>
@@ -57,32 +86,57 @@ export function Dashboard() {
           <p className="lede">Here’s what actually matters today.</p>
         </div>
         <LiquidButton onClick={recommend} disabled={busy}>
-          {busy ? "Reading the board…" : "What should I do now?"}
+          {busy ? "Reading the board…" : "Ask NVIDIA"}
         </LiquidButton>
       </div>
 
-      {planText && (
-        <section className="recommend" aria-live="polite">
-          <p className="kicker">Next</p>
-          <pre className="bubble" style={{ border: 0, padding: 0, fontFamily: "inherit" }}>
-            {planText}
-          </pre>
-        </section>
-      )}
+      <section className="now-card surface-primary" aria-live="polite">
+        <p className="kicker">What should I do now?</p>
+        {plan.primary ? (
+          <>
+            <h2 className="now-title">{plan.primary.title}</h2>
+            <p className="now-meta">
+              {lecture ? `Lecture ${lecture.number}` : plan.primary.kind}
+              {topic ? ` · ${topic.name}` : ""}
+              {` · ~${plan.primary.estimatedMin} min`}
+            </p>
+            <p className="now-reason">Reason: {plan.primary.reasons.slice(0, 2).join(" · ") || plan.note}</p>
+            <div className="now-actions">
+              <button className="btn solid" type="button" onClick={startPlan}>
+                Start
+              </button>
+              <span className="meta-line">{formatDuration(avail.remainingMin)} left in timetable</span>
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            title="Nothing fits this window."
+            body={plan.note}
+            action={
+              <button className="btn" type="button" onClick={() => navigateLectureOs("schedule")}>
+                Check schedule
+              </button>
+            }
+          />
+        )}
+        {busy && !aiNote && (
+          <p className="ai-thinking">
+            <span className="pulse-dot" /> Connecting to NVIDIA…
+          </p>
+        )}
+        {aiNote && <p className="ai-note">{aiNote}</p>}
+      </section>
 
       <div className="dash-grid">
-        <section className="today">
+        <section className="today surface-card">
           <div className="section-title">
-            <h2>Today</h2>
-            <span style={{ color: "var(--faint)", fontSize: 12 }}>
-              {tasks.filter((t) => t.done).length}/{tasks.length || 0}
+            <h2>Today’s tasks</h2>
+            <span className="meta-line">
+              {doneCount}/{tasks.length || 0}
             </span>
           </div>
           {tasks.length === 0 ? (
-            <EmptyState
-              title="The day is still open."
-              body="Add the first concrete task. Keep it small enough to start."
-            />
+            <EmptyState title="The day is still open." body="Add the first concrete task. Keep it small enough to start." />
           ) : (
             tasks.map((task) => (
               <div
@@ -129,12 +183,12 @@ export function Dashboard() {
         </section>
 
         <aside className="stat-stack">
-          <div className="stat">
+          <div className="stat surface-card">
             <p className="kicker">Available today</p>
             <div className="num">{copy.total}</div>
             <p>{copy.window}</p>
           </div>
-          <div className="stat">
+          <div className="stat surface-card">
             <p className="kicker">Backlog</p>
             <div className="num">{snap.totalLectures}</div>
             <p>
@@ -142,7 +196,7 @@ export function Dashboard() {
               {snap.oldestDays ? ` · oldest ${snap.oldestDays}d` : ""}
             </p>
           </div>
-          <div className="stat">
+          <div className="stat surface-card">
             <p className="kicker">Revision</p>
             <div className="num">{due}</div>
             <p>
@@ -152,12 +206,25 @@ export function Dashboard() {
         </aside>
       </div>
 
-      <section style={{ marginTop: 36 }}>
+      {insights.length > 0 && (
+        <section className="insight-grid">
+          {insights.map((insight) => (
+            <article className="insight-card surface-card" key={insight.id}>
+              <p className="kicker">{insight.kicker}</p>
+              <h3>{insight.title}</h3>
+              <p>Suggested action: {insight.action}</p>
+              <button className="btn" type="button" onClick={() => insight.route && navigateLectureOs(insight.route)}>
+                {insight.cta}
+              </button>
+            </article>
+          ))}
+        </section>
+      )}
+
+      <section className="progress-block">
         <div className="section-title">
           <h2>Progress</h2>
-          <span style={{ color: "var(--muted)", fontSize: 13 }}>
-            You studied on {habit.studied} of the last {habit.window} days.
-          </span>
+          <span className="meta-line">You studied on {habit.studied} of the last {habit.window} days.</span>
         </div>
         <div className="bars">
           {progress.map((p) => (

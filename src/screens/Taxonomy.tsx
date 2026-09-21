@@ -13,19 +13,25 @@ export function Taxonomy() {
       <div className="page">
         <p className="kicker">Taxonomy</p>
         <EmptyState
-          title="Subject → chapter → topic → lecture"
-          body="Build the map your planner will actually use. Start with Physics, Chemistry, Maths — or whatever you sit with."
+          title="No lectures yet"
+          body="Add your current batch syllabus to start building your Lecture OS."
+          action={
+            <form
+              className="toolbar"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!subjectName.trim()) return;
+                store.addSubject(subjectName.trim());
+                setSubjectName("");
+              }}
+            >
+              <input className="field" placeholder="First subject" value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
+              <button className="btn solid" type="submit">
+                Add syllabus
+              </button>
+            </form>
+          }
         />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!subjectName.trim()) return;
-            store.addSubject(subjectName.trim());
-            setSubjectName("");
-          }}
-        >
-          <input className="field" placeholder="First subject" value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
-        </form>
       </div>
     );
   }

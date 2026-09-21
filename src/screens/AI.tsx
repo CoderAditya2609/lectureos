@@ -3,6 +3,7 @@ import { useAppState } from "../store/store";
 import { askLectureAI } from "../ai/provider";
 import { buildPlan, planToText } from "../lib/planner";
 import { LiquidButton } from "../components/LiquidButton";
+import { navigateLectureOs } from "../lib/insights";
 
 const PROMPTS = [
   "What should I do now?",
@@ -17,9 +18,11 @@ export function AIScreen() {
   const [q, setQ] = useState("What should I do now?");
   const [a, setA] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   async function run(question: string) {
     setBusy(true);
+    setErr("");
     setQ(question);
     const local = planToText(buildPlan(state));
     if (!state.settings.nvidiaApiKey.trim()) {
@@ -28,9 +31,11 @@ export function AIScreen() {
       return;
     }
     try {
-      setA(await askLectureAI(state, question));
-    } catch (err) {
-      setA(`${local}\n\n${err instanceof Error ? err.message : "AI unavailable"}`);
+      setA("");
+      await askLectureAI(state, question, (chunk) => setA((prev) => prev + chunk));
+    } catch (error) {
+      setA(local);
+      setErr(error instanceof Error ? error.message : "NVIDIA is unavailable.");
     }
     setBusy(false);
   }
@@ -39,9 +44,7 @@ export function AIScreen() {
     <div className="page">
       <p className="kicker">AI · {state.settings.aiProvider}</p>
       <h1>Ask the board</h1>
-      <p className="lede">
-        The model reads your lectures, timetable, backlog, and revision state. It does not need pasted context.
-      </p>
+      <p className="lede">The model reads your lectures, timetable, backlog, and revision state. It does not need pasted context.</p>
       <div className="toolbar">
         {PROMPTS.map((p) => (
           <button key={p} className="chip" onClick={() => run(p)}>
@@ -61,7 +64,25 @@ export function AIScreen() {
           {busy ? "Thinking" : "Ask"}
         </LiquidButton>
       </form>
-      {a && <div className="bubble chat" style={{ marginTop: 28 }}>{a}</div>}
+      {busy && (
+        <p className="ai-thinking">
+          <span className="pulse-dot" /> NVIDIA is reading your board…
+        </p>
+      )}
+      {a && <div className="bubble chat surface-card">{a}</div>}
+      {err && (
+        <div className="error-banner">
+          <p>{err}</p>
+          <div className="toolbar">
+            <button className="btn" type="button" onClick={() => run(q)}>
+              Retry
+            </button>
+            <button className="btn" type="button" onClick={() => navigateLectureOs("settings")}>
+              Check AI settings
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

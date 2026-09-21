@@ -13,7 +13,7 @@ export function Backlog() {
     return (
       <div className="page">
         <p className="kicker">Backlog</p>
-        <EmptyState title="Backlog cleared." body="Nothing is waiting for you." />
+        <EmptyState title="Backlog cleared." body="Nothing is waiting. Add lectures when the next batch lands." />
       </div>
     );
   }

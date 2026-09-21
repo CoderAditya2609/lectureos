@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RouteId } from "./types";
 import { Dashboard } from "./screens/Dashboard";
 import { Lectures } from "./screens/Lectures";
@@ -22,8 +22,19 @@ const NAV: { id: RouteId; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
+const ROUTES = new Set<RouteId>(NAV.map((n) => n.id));
+
 export default function App() {
   const [route, setRoute] = useState<RouteId>("dashboard");
+
+  useEffect(() => {
+    const onNav = (event: Event) => {
+      const next = (event as CustomEvent<string>).detail;
+      if (ROUTES.has(next as RouteId)) setRoute(next as RouteId);
+    };
+    window.addEventListener("lectureos:navigate", onNav);
+    return () => window.removeEventListener("lectureos:navigate", onNav);
+  }, []);
 
   return (
     <div className="app">

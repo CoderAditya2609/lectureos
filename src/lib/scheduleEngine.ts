@@ -17,9 +17,19 @@ export interface DayAvailability {
   windows: WindowInfo[];
 }
 
+/** Blocks that end at or after midnight (e.g. 21:00–00:00) are 3h, not zero. */
+export function blockSpan(startHHMM: string, endHHMM: string): { start: number; end: number } {
+  const start = parseMinutes(startHHMM);
+  let end = parseMinutes(endHHMM);
+  if (end <= start) end += 24 * 60;
+  return { start, end };
+}
+
 function overlapRemaining(start: number, end: number, now: number): number {
-  if (now >= end) return 0;
-  const from = Math.max(start, now);
+  let t = now;
+  if (end > 24 * 60 && t < start - 12 * 60) t += 24 * 60;
+  if (t >= end) return 0;
+  const from = Math.max(start, t);
   return Math.max(0, end - from);
 }
 
@@ -29,33 +39,39 @@ export function blocksForDay(state: AppState, dayOfWeek: number): TimeBlock[] {
     .sort((a, b) => parseMinutes(a.start) - parseMinutes(b.start));
 }
 
-export function availability(
-  state: AppState,
-  date = new Date(),
-): DayAvailability {
+export function availability(state: AppState, date = new Date()): DayAvailability {
   const day = date.getDay();
   const nowMin = date.getHours() * 60 + date.getMinutes();
   const isToday = todayISO(date) === todayISO(new Date());
   const blocks = blocksForDay(state, day).filter((b) => b.kind !== "blocked");
-  const buffer = 1 - state.settings.bufferPercent / 100;
+  const efficiency = 1 - Math.min(40, Math.max(0, state.settings.bufferPercent)) / 100;
 
   const windows: WindowInfo[] = blocks.map((b) => {
-    const start = parseMinutes(b.start);
-    const end = parseMinutes(b.end);
+    const { start, end } = blockSpan(b.start, b.end);
     const minutes = Math.max(0, end - start);
     const remaining = isToday ? overlapRemaining(start, end, nowMin) : minutes;
     return { start: b.start, end: b.end, kind: b.kind, minutes, remaining };
   });
 
+  let wrapFromYesterday = 0;
+  if (isToday) {
+    const yesterday = (day + 6) % 7;
+    for (const b of blocksForDay(state, yesterday).filter((x) => x.kind !== "blocked")) {
+      const span = blockSpan(b.start, b.end);
+      if (span.end <= 24 * 60) continue;
+      const endToday = span.end - 24 * 60;
+      wrapFromYesterday += Math.max(0, endToday - nowMin);
+    }
+  }
+
   const freeMin = windows.reduce((s, w) => s + w.minutes, 0);
-  const remainingRaw = windows.reduce((s, w) => s + w.remaining, 0);
-  const remainingMin = Math.round(remainingRaw * buffer);
-  const realisticMin = Math.round(freeMin * buffer * 0.85);
+  const remainingRaw = windows.reduce((s, w) => s + w.remaining, 0) + wrapFromYesterday;
+  const remainingMin = Math.round(remainingRaw);
+  const realisticMin = Math.round(remainingRaw * efficiency);
+  const open = windows.filter((w) => w.remaining > 0);
   const longest =
-    windows
-      .filter((w) => w.remaining > 0)
-      .sort((a, b) => b.remaining - a.remaining)[0] ??
-    windows.sort((a, b) => b.minutes - a.minutes)[0] ??
+    [...open].sort((a, b) => b.remaining - a.remaining)[0] ??
+    [...windows].sort((a, b) => b.minutes - a.minutes)[0] ??
     null;
 
   return { freeMin, realisticMin, remainingMin, longest, windows };

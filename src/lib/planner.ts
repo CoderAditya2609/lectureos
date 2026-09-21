@@ -39,8 +39,7 @@ export function buildPlan(state: AppState, now = new Date()): PlanResult {
   const today = todayISO(now);
   const avail = availability(state, now);
   const availableMin = avail.remainingMin;
-  const buffer = Math.max(8, Math.round(availableMin * (state.settings.bufferPercent / 100)));
-  const usable = Math.max(0, availableMin - Math.min(buffer, 20));
+  const usable = avail.realisticMin;
 
   const doneToday = new Set(
     state.tasks.filter((t) => t.date === today && t.done).map((t) => t.lectureId).filter(Boolean),

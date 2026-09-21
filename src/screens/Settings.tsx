@@ -1,31 +1,119 @@
 import { useState } from "react";
 import { useAppState, store } from "../store/store";
 import { LiquidMetalButton } from "../components/LiquidMetal";
-import { verifyNvidiaApiKey, normalizeNvidiaKey } from "../ai/provider";
+import { verifyNvidiaApiKey, normalizeNvidiaKey, maskApiKey, type NvidiaVerifyResult } from "../ai/provider";
 
 export function Settings() {
   const { settings } = useAppState();
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [result, setResult] = useState<NvidiaVerifyResult | null>(null);
 
   async function verifyKey() {
+    const key = normalizeNvidiaKey(settings.nvidiaApiKey);
+    if (!key) {
+      setResult({
+        ok: false,
+        code: "empty",
+        message: "Paste an NVIDIA API key first.",
+        model: settings.nvidiaModel,
+        provider: "NVIDIA",
+      });
+      return;
+    }
     setBusy(true);
-    setNote("");
-    const result = await verifyNvidiaApiKey(settings.nvidiaApiKey, settings.nvidiaModel);
-    store.updateSettings({
-      nvidiaApiKey: normalizeNvidiaKey(settings.nvidiaApiKey),
-      nvidiaApiKeyVerified: result.ok,
-      nvidiaModel: result.model,
-    });
-    setNote(result.message);
-    setBusy(false);
+    setResult(null);
+    try {
+      const next = await verifyNvidiaApiKey(key, settings.nvidiaModel);
+      store.updateSettings({
+        nvidiaApiKey: key,
+        nvidiaApiKeyVerified: next.ok,
+        nvidiaModel: next.model,
+      });
+      setResult(next);
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const status = result ?? (settings.nvidiaApiKeyVerified
+    ? {
+        ok: true,
+        code: "ok" as const,
+        message: `Connected to NVIDIA AI · ${settings.nvidiaModel}`,
+        model: settings.nvidiaModel,
+        provider: "NVIDIA" as const,
+      }
+    : null);
 
   return (
     <div className="page">
       <p className="kicker">Settings</p>
       <h1>Preferences</h1>
-      <p className="lede">Provider is abstracted as NVIDIA. Swap later without rewriting the app.</p>
+      <p className="lede">Keep the planner honest. Connect NVIDIA when you want model-backed recommendations.</p>
+
+      <section className="ai-card">
+        <p className="kicker">AI connection</p>
+        <h2>NVIDIA AI</h2>
+        <p className="ai-card-copy">Power Lecture OS intelligence with your own NVIDIA API key.</p>
+
+        <label className="ai-key-label">
+          <span>API key</span>
+          <div className="ai-key-row">
+            <input
+              className="field"
+              type={showKey ? "text" : "password"}
+              autoComplete="off"
+              spellCheck={false}
+              value={settings.nvidiaApiKey}
+              placeholder="nvapi-…"
+              onChange={(e) => {
+                store.updateSettings({ nvidiaApiKey: e.target.value });
+                setResult(null);
+              }}
+            />
+            <button className="btn" type="button" onClick={() => setShowKey((v) => !v)}>
+              {showKey ? "Hide" : "Show"}
+            </button>
+          </div>
+        </label>
+
+        <div className="ai-verify-row">
+          <LiquidMetalButton size="sm" onClick={verifyKey} disabled={busy || !settings.nvidiaApiKey.trim()}>
+            {busy ? "Verifying" : "Verify connection"}
+          </LiquidMetalButton>
+        </div>
+
+        <div className={`ai-status ${busy ? "pending" : status?.ok ? "ok" : status ? "bad" : ""}`}>
+          {busy && (
+            <p className="ai-thinking">
+              <span className="pulse-dot" /> Connecting to NVIDIA…
+            </p>
+          )}
+          {!busy && status?.ok && (
+            <>
+              <p className="ai-status-title">✓ Connected</p>
+              <p>NVIDIA AI</p>
+              <p>Model: {status.model}</p>
+              {status.latencyMs != null && <p>Response: {status.latencyMs} ms</p>}
+              {settings.nvidiaApiKey && <p className="meta-line">{maskApiKey(settings.nvidiaApiKey)}</p>}
+            </>
+          )}
+          {!busy && status && !status.ok && (
+            <>
+              <p className="ai-status-title">✕ Connection failed</p>
+              <p>{status.message}</p>
+              <button className="btn" type="button" onClick={verifyKey}>
+                Try again
+              </button>
+            </>
+          )}
+          {!busy && !status && (
+            <p className="meta-line">AI will not call NVIDIA until this key verifies against a real request.</p>
+          )}
+        </div>
+      </section>
+
       <div className="fields" style={{ maxWidth: 520 }}>
         <label>
           <span>Display name</span>
@@ -43,27 +131,6 @@ export function Settings() {
             onChange={(e) => store.updateSettings({ nvidiaModel: e.target.value, nvidiaApiKeyVerified: false })}
           />
         </label>
-        <label>
-          <span>NVIDIA API key</span>
-          <input
-            className="field"
-            type="password"
-            autoComplete="off"
-            value={settings.nvidiaApiKey}
-            onChange={(e) => store.updateSettings({ nvidiaApiKey: e.target.value })}
-          />
-        </label>
-        <div className="key-verify">
-          <LiquidMetalButton size="sm" onClick={verifyKey} disabled={busy || !settings.nvidiaApiKey.trim()}>
-            {busy ? "Checking" : settings.nvidiaApiKeyVerified ? "Verified" : "Verify key"}
-          </LiquidMetalButton>
-          <p className={`key-status ${settings.nvidiaApiKeyVerified ? "ok" : note ? "bad" : ""}`}>
-            {note ||
-              (settings.nvidiaApiKeyVerified
-                ? `Ready · ${settings.nvidiaModel}`
-                : "AI will not run until this key verifies against NVIDIA.")}
-          </p>
-        </div>
         <label>
           <span>Planning buffer (%)</span>
           <input

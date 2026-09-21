@@ -15,9 +15,13 @@
   --info: #7d93a6;
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   --serif: "Instrument Serif", Georgia, serif;
-  --sans: "Manrope", system-ui, sans-serif;
-  --radius: 10px;
+  --sans: "Inter", system-ui, sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
   --sidebar: 228px;
+  --space: 8px;
+  --elev: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.28);
+  --elev-hover: 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 44px rgba(0, 0, 0, 0.38);
 }
 
 * {
@@ -107,8 +111,9 @@ a {
   border: 0;
   color: var(--muted);
   padding: 9px 12px;
-  border-radius: 8px;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  border-radius: var(--radius-sm);
+  position: relative;
+  transition: background 180ms ease, color 180ms ease;
 }
 
 .nav button:hover {
@@ -119,6 +124,17 @@ a {
 .nav button.active {
   color: var(--text);
   background: rgba(194, 163, 106, 0.1);
+}
+
+.nav button.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 .sidebar .meta {
@@ -295,8 +311,11 @@ h1 {
 }
 
 .stat {
-  padding: 18px 0;
-  border-top: 1px solid var(--line);
+  padding: 18px 20px;
+}
+
+.stat.surface-card:hover {
+  transform: translateY(-2px);
 }
 
 .stat .num {
